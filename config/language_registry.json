@@ -1,0 +1,119 @@
+{
+  "languages": {
+    "ta": {
+      "name": "Tamil",
+      "script": "indic",
+      "unicode_start": "0x0B80",
+      "unicode_end": "0x0BFF",
+      "model_path": "models/nllb_ta_en",
+      "tokenizer": "models/ta_tokenizer.model",
+      "supported_styles": ["formal", "casual", "spoken", "regional_mumbai"],
+      "is_supported": true
+    },
+    "te": {
+      "name": "Telugu",
+      "script": "indic",
+      "unicode_start": "0x0C60",
+      "unicode_end": "0x0C7F",
+      "model_path": "models/nllb_te_en",
+      "tokenizer": "models/te_tokenizer.model",
+      "supported_styles": ["formal", "casual"],
+      "is_supported": true
+    },
+    "kn": {
+      "name": "Kannada",
+      "script": "indic",
+      "unicode_start": "0x0C80",
+      "unicode_end": "0x0CFF",
+      "model_path": "models/nllb_kn_en",
+      "tokenizer": "models/kn_tokenizer.model",
+      "supported_styles": ["formal", "casual"],
+      "is_supported": true
+    },
+    "ml": {
+      "name": "Malayalam",
+      "script": "indic",
+      "unicode_start": "0x0D00",
+      "unicode_end": "0x0D7F",
+      "model_path": "models/nllb_ml_en",
+      "tokenizer": "models/ml_tokenizer.model",
+      "supported_styles": ["formal", "casual"],
+      "is_supported": true
+    },
+    "hi": {
+      "name": "Hindi",
+      "script": "indic",
+      "unicode_start": "0x0900",
+      "unicode_end": "0x097F",
+      "model_path": "models/nllb_hi_en",
+      "tokenizer": "models/hi_tokenizer.model",
+      "supported_styles": ["formal", "casual"],
+      "is_supported": true
+    },
+    "en": {
+      "name": "English",
+      "script": "latin",
+      "unicode_start": "0x0041",
+      "unicode_end": "0x007A",
+      "model_path": "models/nllb_en_ta",
+      "tokenizer": "models/en_tokenizer.model",
+      "supported_styles": ["formal", "casual"],
+      "is_supported": true
+    }
+  },
+  "language_pairs": {
+    "ta-en": {
+      "source": "ta",
+      "target": "en",
+      "model": "nllb-200-distilled-600M",
+      "adapter_path": "nllb_lora_refined/best_model",
+      "supported": true
+    },
+    "te-en": {
+      "source": "te",
+      "target": "en",
+      "model": "nllb-200-distilled-600M",
+      "adapter_path": "nllb_lora_results/best_model",
+      "supported": true
+    },
+    "kn-en": {
+      "source": "kn",
+      "target": "en",
+      "model": "nllb-200-distilled-600M",
+      "adapter_path": "nllb_lora_results/best_model",
+      "supported": true
+    },
+    "ml-en": {
+      "source": "ml",
+      "target": "en",
+      "model": "nllb-200-distilled-600M",
+      "adapter_path": "nllb_lora_results/best_model",
+      "supported": true
+    },
+    "hi-en": {
+      "source": "hi",
+      "target": "en",
+      "model": "nllb-200-distilled-600M",
+      "adapter_path": "nllb_lora_results/best_model",
+      "supported": true
+    },
+    "en-ta": {
+      "source": "en",
+      "target": "ta",
+      "model": "nllb-200-distilled-600M",
+      "adapter_path": "nllb_lora_refined/best_model",
+      "supported": true
+    }
+  },
+  "model_cache": {
+    "max_cached_models": 2,
+    "cache_dir": "models/.cache",
+    "auto_download": true
+  },
+  "features": {
+    "cultural_intelligence": true,
+    "style_adaptation": true,
+    "transliteration": true,
+    "backtranslation": true
+  }
+}

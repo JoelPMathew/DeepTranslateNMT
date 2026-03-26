@@ -1,0 +1,52 @@
+{
+    "idioms": [
+        {
+            "tamil": "கையை கடிக்கிறது",
+            "english_literal": "Biting the hand",
+            "metaphor": "It is very expensive / Beyond my budget",
+            "context": "Used when something costs more than expected or when one's financial situation is tight."
+        },
+        {
+            "tamil": "ஆகாயத் தாமரை",
+            "english_literal": "Sky lotus",
+            "metaphor": "Impossible / Non-existent",
+            "context": "Refers to something that exists only in imagination or is impossible to achieve."
+        },
+        {
+            "tamil": "அரைத்த மாவை அரைத்தல்",
+            "english_literal": "Grinding the ground flour",
+            "metaphor": "Repeating the same thing over and over",
+            "context": "Used when someone talks about the same topic repeatedly or does the same redundant task."
+        },
+        {
+            "tamil": "தலை தப்புவது",
+            "english_literal": "Head escaping",
+            "metaphor": "Narrowly escaping a disaster",
+            "context": "Used when someone survives a very dangerous situation or big trouble."
+        },
+        {
+            "tamil": "புலிக்கு பிறந்தது பூனையாகுமா?",
+            "english_literal": "Will a tiger's offspring be a cat?",
+            "metaphor": "Like father, like son / Greatness is inherited",
+            "context": "Used when children show the same talent or strength as their parents."
+        },
+        {
+            "tamil": "ஏட்டுச் சுரைக்காய் கறிக்கு உதவாது",
+            "english_literal": "A book-drawn bottle gourd won't serve for curry",
+            "metaphor": "Theoretical knowledge without practical use",
+            "context": "Used when something looks good on paper but doesn't work in reality."
+        },
+        {
+            "tamil": "கழுதைக்குத் தெரியுமா கற்பூர வாசனை?",
+            "english_literal": "Does a donkey know the scent of camphor?",
+            "metaphor": "Casting pearls before swine",
+            "context": "Used when someone cannot appreciate the value of something fine or sacred."
+        },
+        {
+            "tamil": "நிழலின் அருமை வெயிலில் தெரியும்",
+            "english_literal": "The value of shade is known in the sun",
+            "metaphor": "Appreciating something only after losing it",
+            "context": "Used to teach the importance of valuing people or things while they are present."
+        }
+    ]
+}
