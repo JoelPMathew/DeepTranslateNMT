@@ -4,8 +4,7 @@ Handles real-time speech-to-speech translation with support for multiple languag
 Includes speech recognition, translation, and text-to-speech synthesis.
 """
 import os
-import io
-from typing import Optional, Dict, Tuple, Any
+from typing import Optional, Dict, Tuple, Any, Callable, List
 from dataclasses import dataclass
 from enum import Enum
 import tempfile
@@ -54,7 +53,7 @@ class SpeechRecognizer:
     def _init_backend(self):
         """Initialize speech recognition backend"""
         try:
-            import speech_recognition as sr
+            import speech_recognition as sr  # type: ignore[reportMissingImports]
             return sr.Recognizer()
         except ImportError:
             raise ImportError(
@@ -73,7 +72,7 @@ class SpeechRecognizer:
             Tuple of (recognized_text, confidence_score)
         """
         try:
-            import speech_recognition as sr
+            import speech_recognition as sr  # type: ignore[reportMissingImports]
         except ImportError:
             raise ImportError("speech_recognition required")
 
@@ -119,7 +118,7 @@ class SpeechRecognizer:
             Tuple of (recognized_text, confidence_score)
         """
         try:
-            import speech_recognition as sr
+            import speech_recognition as sr  # type: ignore[reportMissingImports]
         except ImportError:
             raise ImportError("speech_recognition required")
 
@@ -145,8 +144,8 @@ class SpeechRecognizer:
     def _convert_mp3_to_wav(mp3_path: str) -> Any:
         """Convert MP3 to WAV format for processing"""
         try:
-            from pydub import AudioSegment
-            import speech_recognition as sr
+            from pydub import AudioSegment  # type: ignore[reportMissingImports]
+            import speech_recognition as sr  # type: ignore[reportMissingImports]
         except ImportError:
             raise ImportError("pydub required for MP3 support. Install with: pip install pydub")
 
@@ -173,14 +172,7 @@ class SpeechRecognizer:
         Returns:
             Detected language code (e.g., 'en', 'es', 'fr')
         """
-        try:
-            from google.cloud import speech_v1
-        except ImportError:
-            # Fallback: return default language
-            return self.language.split('-')[0]
-
-        # This would require Google Cloud Speech API credentials
-        # For now, return a simple fallback
+        # Placeholder implementation. Full language ID requires configured cloud backend.
         return self.language.split('-')[0]
 
 
@@ -195,7 +187,7 @@ class TextToSpeech:
     def _init_engine(self):
         """Initialize TTS engine"""
         try:
-            import pyttsx3
+            import pyttsx3  # type: ignore[reportMissingImports]
             engine = pyttsx3.init()
             
             # Set language/voice properties
@@ -225,7 +217,7 @@ class TextToSpeech:
             Path to generated audio file
         """
         try:
-            import pyttsx3
+            import pyttsx3  # type: ignore[reportMissingImports]
         except ImportError:
             raise ImportError("pyttsx3 required")
 
@@ -264,7 +256,7 @@ class TextToSpeech:
     def list_voices(self) -> Dict[str, str]:
         """List available voices"""
         try:
-            import pyttsx3
+            import pyttsx3  # type: ignore[reportMissingImports]
         except ImportError:
             raise ImportError("pyttsx3 required")
 
@@ -290,9 +282,9 @@ class SpeechTranslationPipeline:
         self.target_language = target_language
         self.recognizer = SpeechRecognizer(source_language)
         self.tts = TextToSpeech(target_language)
-        self.translator = None  # Will be injected from main app
+        self.translator: Optional[Callable[[str], str]] = None  # Will be injected from main app
 
-    def set_translator(self, translator_func):
+    def set_translator(self, translator_func: Callable[[str], str]):
         """Set the translation function"""
         self.translator = translator_func
 
@@ -370,7 +362,7 @@ class SpeechTranslationPipeline:
             confidence=confidence
         )
 
-    def batch_translate_directory(self, directory: str, output_dir: str) -> list:
+    def batch_translate_directory(self, directory: str, output_dir: str) -> List[TranslatedSpeech]:
         """
         Translate all audio files in a directory
         

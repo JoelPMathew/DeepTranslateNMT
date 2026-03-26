@@ -3,11 +3,10 @@ Speech Translation API Integration
 Endpoints for real-time and batch speech translation
 """
 from fastapi import APIRouter, UploadFile, File, Query, HTTPException
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 import tempfile
 import os
-from typing import Optional
-import io
+from typing import Callable, List, Optional
 
 from speech_translator import (
     SpeechTranslationPipeline, 
@@ -45,6 +44,12 @@ class SpeechTranslationService:
 speech_service = SpeechTranslationService()
 
 
+def _safe_suffix(file: UploadFile) -> str:
+    """Return a safe file suffix even when filename is missing."""
+    name = file.filename or "audio.wav"
+    return os.path.splitext(name)[1] or ".wav"
+
+
 @speech_router.post("/recognize")
 async def recognize_speech(
     file: UploadFile = File(...),
@@ -57,7 +62,7 @@ async def recognize_speech(
     """
     try:
         # Save uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=_safe_suffix(file)) as temp_file:
             content = await file.read()
             temp_file.write(content)
             temp_path = temp_file.name
@@ -85,14 +90,14 @@ async def translate_speech(
     file: UploadFile = File(...),
     source_language: str = Query("en-US"),
     target_language: str = Query("es-ES"),
-    translator_func = None  # Injected from main app
+    translator_func: Optional[Callable[[str], str]] = None  # Injected from main app
 ):
     """
     Complete speech translation: recognize -> translate -> synthesize
     """
     try:
         # Save uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(file.filename)[1]) as temp_file:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=_safe_suffix(file)) as temp_file:
             content = await file.read()
             temp_file.write(content)
             temp_path = temp_file.name
@@ -174,7 +179,7 @@ async def list_available_voices():
 
 @speech_router.post("/batch-translate")
 async def batch_translate_speeches(
-    files: list = File(...),
+    files: List[UploadFile] = File(...),
     source_language: str = Query("en-US"),
     target_language: str = Query("es-ES")
 ):
@@ -192,7 +197,7 @@ async def batch_translate_speeches(
             for file in files:
                 with tempfile.NamedTemporaryFile(
                     delete=False,
-                    suffix=os.path.splitext(file.filename)[1],
+                    suffix=_safe_suffix(file),
                     dir=temp_dir
                 ) as temp_file:
                     content = await file.read()
@@ -217,14 +222,14 @@ async def batch_translate_speeches(
                     # Translate
                     result = pipeline.translate_audio_file(temp_path)
                     results.append({
-                        "filename": file.filename,
+                        "filename": file.filename or "unknown",
                         "original_text": result.original_text,
                         "translated_text": result.translated_text,
                         "confidence": result.confidence
                     })
                 except Exception as e:
                     results.append({
-                        "filename": file.filename,
+                        "filename": file.filename or "unknown",
                         "error": str(e)
                     })
                 finally:
