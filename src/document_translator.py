@@ -238,7 +238,7 @@ class PDFParser:
         Note: Requires pypdf2 or pdfplumber
         """
         try:
-            import pdfplumber
+            import pdfplumber  # type: ignore
         except ImportError:
             raise ImportError("pdfplumber required for PDF support. Install with: pip install pdfplumber")
         
@@ -269,8 +269,8 @@ class PDFParser:
         Note: This is a simplified approach - full PDF editing is complex
         """
         # For now, create a text file with translations
-        from reportlab.lib.pagesizes import letter
-        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import letter  # type: ignore
+        from reportlab.pdfgen import canvas  # type: ignore
         
         c = canvas.Canvas(output_path, pagesize=letter)
         y = 750
