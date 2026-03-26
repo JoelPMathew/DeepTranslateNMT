@@ -730,8 +730,10 @@ export default function App() {
   return (
     <div className="app">
       <header className="app-header">
-        <h1>🌐 DeepTranslate Pro 2.0</h1>
-        <p>Audience-Aware • Glossary Lock • Quality Guardrails</p>
+        <div className="header-brand">
+          <h1>🧠 DeepTranslateNMT</h1>
+          <p className="tagline">Neural Machine Translation • Real-Time Speech • Advanced Quality Assurance</p>
+        </div>
       </header>
 
       <nav className="tabs">
@@ -762,7 +764,10 @@ export default function App() {
       </main>
 
       <footer className="app-footer">
-        <p>© 2026 DeepTranslate Pro • Advanced Neural Machine Translation</p>
+        <div className="footer-content">
+          <p>© 2026 DeepTranslateNMT • Cutting-Edge Neural Machine Translation Platform</p>
+          <p className="footer-features">Speech Translation • Document Processing • Real-Time Collaboration • Quality Guardrails</p>
+        </div>
       </footer>
     </div>
   );
