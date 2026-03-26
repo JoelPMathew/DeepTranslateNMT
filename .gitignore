@@ -35,10 +35,13 @@ env/
 *~
 .DS_Store
 
-models/*.pt
+models/
+nllb_lora_results/
+nllb_lora_refined/
 outputs/
 uploads/
 .cache/
+.env.example
 
 node_modules/
 package-lock.json
