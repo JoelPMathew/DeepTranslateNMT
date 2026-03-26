@@ -61,5 +61,12 @@
   "en->ta::general::neutral::hello my name is joel::": "வணக்கம் என் பெயர் ஜோயல்",
   "en->ta::general::casual::hello my name is joel::": "ஹாய் என் பெயர் ஜோயல்!",
   "en->ta::general::casual::hi whatsup::": "ஹாய் வாட்ஸ்அப்!",
-  "en->ta::general::formal::hi whatsup::": "வணக்கம் வாட்ஸ்அப்."
+  "en->ta::general::formal::hi whatsup::": "வணக்கம் வாட்ஸ்அப்.",
+  "en->ta::student::formal::hi macha how are you::": "வணக்கம் மச்சா எப்படி இருக்கீங்க.",
+  "en->ta::student::formal::hi macha how are you::bank:financial institution": "வணக்கம் மச்சா எப்படி இருக்கீங்க.",
+  "en->ta::student::casual::hi macha how are you::bank:financial institution": "ஹாய் மச்சா எப்படி இருக்கீங்க!",
+  "en->ta::student::neutral::hi macha how are you::bank:financial institution": "ஹாய் மச்சா எப்படி இருக்கீங்க",
+  "en->ta::student::formal::hi macha how are you::macha:brother": "வணக்கம் brother எப்படி இருக்கிறீர்கள்.",
+  "en->ta::student::neutral::hi macha how are you::macha:brother": "ஹாய் brother எப்படி இருக்கிறீர்கள்",
+  "en->ta::student::neutral::hi macha how are you::macha:anna": "ஹாய் anna எப்படி இருக்கிறீர்கள்"
 }

@@ -5,7 +5,7 @@ while preserving formatting and structure.
 """
 import os
 import json
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Any
 from pathlib import Path
 from dataclasses import dataclass, asdict
 from enum import Enum
@@ -29,7 +29,7 @@ class TranslatedSegment:
     start_offset: int
     end_offset: int
     segment_type: str = "text"  # text, heading, footer, etc.
-    metadata: Dict = None
+    metadata: Optional[Dict[str, Any]] = None
 
     def to_dict(self):
         return asdict(self)
@@ -280,7 +280,9 @@ class PDFParser:
                 # Write translated text
                 text_obj = c.beginText(50, y)
                 text_obj.setFont("Helvetica", 10)
-                text_obj.textLines(seg.translated, maxWidth=500)
+                # Split text into lines manually and add them
+                for line in seg.translated.split("\n"):
+                    text_obj.textLine(line)
                 c.drawText(text_obj)
                 y -= 30
                 
@@ -316,7 +318,7 @@ class DocxParser:
                     start_offset=para_idx,
                     end_offset=para_idx,
                     segment_type="docx_paragraph",
-                    metadata={'paragraph_index': para_idx, 'style': para.style.name}
+                    metadata={'paragraph_index': para_idx, 'style': para.style.name if para.style else 'Normal'}
                 )
                 segments.append(segment)
         
