@@ -74,12 +74,14 @@ try:
     from .document_translator import DocumentParser, TranslationMemory, DocumentFormat
     from .ollama_translator import OllamaTranslator
     from .cloud_llm_translator import CloudLLMTranslator
+    from .speech_api import speech_router
 except ImportError:
     # Fallback for direct execution
     from language_detector import LanguageDetector, Language
     from document_translator import DocumentParser, TranslationMemory, DocumentFormat
     from ollama_translator import OllamaTranslator
     from cloud_llm_translator import CloudLLMTranslator
+    from speech_api import speech_router
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -91,6 +93,9 @@ app = FastAPI(
     description="Multi-language Neural Machine Translation with Collaboration",
     version="2.0.0"
 )
+
+# Register modular routers
+app.include_router(speech_router)
 
 # Add CORS middleware
 app.add_middleware(

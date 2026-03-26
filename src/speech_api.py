@@ -8,12 +8,20 @@ import tempfile
 import os
 from typing import Callable, List, Optional
 
-from speech_translator import (
-    SpeechTranslationPipeline, 
-    SpeechRecognizer, 
-    TextToSpeech,
-    TranslatedSpeech
-)
+try:
+    from .speech_translator import (
+        SpeechTranslationPipeline,
+        SpeechRecognizer,
+        TextToSpeech,
+        TranslatedSpeech,
+    )
+except ImportError:
+    from speech_translator import (
+        SpeechTranslationPipeline,
+        SpeechRecognizer,
+        TextToSpeech,
+        TranslatedSpeech,
+    )
 
 # Create router for speech endpoints
 speech_router = APIRouter(prefix="/api/v2/speech", tags=["speech"])
@@ -24,8 +32,6 @@ class SpeechTranslationService:
     
     def __init__(self):
         self.pipelines = {}
-        self.recognizer = SpeechRecognizer()
-        self.tts = TextToSpeech()
 
     def get_pipeline(self, source_lang: str, target_lang: str) -> SpeechTranslationPipeline:
         """Get or create a pipeline for language pair"""

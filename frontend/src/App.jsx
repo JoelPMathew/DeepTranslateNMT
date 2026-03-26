@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import './App.css';
 
 const API_BASE = '/api/v2';
@@ -415,6 +415,314 @@ export const DocumentTranslator = () => {
   );
 };
 
+// Speech Translation Component
+export const SpeechTranslator = () => {
+  const [file, setFile] = useState(null);
+  const [sourceLanguage, setSourceLanguage] = useState('en-US');
+  const [targetLanguage, setTargetLanguage] = useState('ta-IN');
+  const [translating, setTranslating] = useState(false);
+  const [recognizedText, setRecognizedText] = useState('');
+  const [translatedText, setTranslatedText] = useState('');
+  const [confidence, setConfidence] = useState(0);
+  const [error, setError] = useState('');
+  const [audioUrl, setAudioUrl] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState('');
+  const [liveTranslation, setLiveTranslation] = useState('');
+  const [liveStatus, setLiveStatus] = useState('Idle');
+  const fileInputRef = useRef();
+  const recognitionRef = useRef(null);
+
+  const toTextLanguageCode = (speechCode) => {
+    if (!speechCode) return 'en';
+    return speechCode.split('-')[0].toLowerCase();
+  };
+
+  const translateLiveSegment = async (segment) => {
+    const clean = segment.trim();
+    if (!clean) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/translate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: clean,
+          source_language: toTextLanguageCode(sourceLanguage),
+          target_language: toTextLanguageCode(targetLanguage),
+          style: 'neutral',
+          audience: 'general',
+          glossary_terms: {},
+          return_alternatives: false,
+          enable_deep_checks: false,
+          use_translation_memory: true,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || 'Live translation failed');
+      }
+
+      const translated = (data.translated_text || '').trim();
+      if (!translated) return;
+
+      setLiveTranslation((prev) => (prev ? `${prev} ${translated}` : translated));
+      setTranslatedText((prev) => (prev ? `${prev} ${translated}` : translated));
+    } catch (err) {
+      setError(err.message || 'Live translation failed');
+    }
+  };
+
+  const stopLiveTranslation = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    setIsListening(false);
+    setLiveStatus('Stopped');
+  };
+
+  const startLiveTranslation = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setError('Live speech is not supported in this browser. Try Chrome or Edge.');
+      return;
+    }
+
+    setError('');
+    setLiveStatus('Listening...');
+
+    if (!recognitionRef.current) {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      recognition.onresult = async (event) => {
+        let interim = '';
+        let finalized = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          const chunk = event.results[i][0]?.transcript || '';
+          if (event.results[i].isFinal) {
+            finalized += `${chunk} `;
+          } else {
+            interim += chunk;
+          }
+        }
+
+        if (finalized.trim()) {
+          setLiveTranscript((prev) => `${prev}${prev ? ' ' : ''}${finalized.trim()}`);
+          setRecognizedText((prev) => `${prev}${prev ? ' ' : ''}${finalized.trim()}`);
+          await translateLiveSegment(finalized);
+        } else {
+          setLiveStatus(`Listening... ${interim}`);
+        }
+      };
+
+      recognition.onerror = (event) => {
+        setError(`Live speech error: ${event.error}`);
+        setIsListening(false);
+        setLiveStatus('Error');
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        setLiveStatus((prev) => (prev === 'Error' ? prev : 'Stopped'));
+      };
+
+      recognitionRef.current = recognition;
+    }
+
+    recognitionRef.current.lang = sourceLanguage;
+    recognitionRef.current.start();
+    setIsListening(true);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+    };
+  }, [audioUrl]);
+
+  const handleFileSelect = (e) => {
+    const selected = e.target.files?.[0] || null;
+    setFile(selected);
+    setRecognizedText('');
+    setTranslatedText('');
+    setConfidence(0);
+    setError('');
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+      setAudioUrl('');
+    }
+  };
+
+  const handleSpeechTranslate = async () => {
+    if (!file) return;
+    setTranslating(true);
+    setError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const params = new URLSearchParams({
+        source_language: sourceLanguage,
+        target_language: targetLanguage,
+      });
+
+      const response = await fetch(`${API_BASE}/speech/translate?${params.toString()}`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.detail || 'Speech translation failed');
+      }
+
+      setRecognizedText(data.original_text || '');
+      setTranslatedText(data.translated_text || '');
+      setConfidence(data.confidence || 0);
+    } catch (err) {
+      setError(err.message || 'Speech translation failed');
+    } finally {
+      setTranslating(false);
+    }
+  };
+
+  const handleGenerateAudio = async () => {
+    if (!translatedText.trim()) return;
+    setError('');
+
+    try {
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+        setAudioUrl('');
+      }
+
+      const ttsLanguage = targetLanguage.split('-')[0] || 'en';
+      const params = new URLSearchParams({
+        text: translatedText,
+        language: ttsLanguage,
+      });
+
+      const response = await fetch(`${API_BASE}/speech/synthesize?${params.toString()}`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail || 'Speech synthesis failed');
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      setAudioUrl(url);
+    } catch (err) {
+      setError(err.message || 'Speech synthesis failed');
+    }
+  };
+
+  return (
+    <div className="document-translator speech-translator">
+      <h2>🎤 Speech Translation</h2>
+
+      <div className="upload-section">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".wav,.mp3,.flac,.ogg,.m4a"
+          onChange={handleFileSelect}
+          style={{ display: 'none' }}
+        />
+        <button type="button" onClick={() => fileInputRef.current?.click()} className="upload-btn">
+          Choose Audio
+        </button>
+        {file && <span>{file.name}</span>}
+      </div>
+
+      <div className="live-card">
+        <div className="live-header">
+          <h3>Live Microphone Translation</h3>
+          <span className={`live-pill ${isListening ? 'on' : 'off'}`}>{liveStatus}</span>
+        </div>
+        <div className="live-actions">
+          <button
+            type="button"
+            className="upload-btn"
+            onClick={startLiveTranslation}
+            disabled={isListening}
+          >
+            Start Live
+          </button>
+          <button
+            type="button"
+            className="upload-btn"
+            onClick={stopLiveTranslation}
+            disabled={!isListening}
+          >
+            Stop Live
+          </button>
+        </div>
+        <p className="live-note">Speak continuously. Finalized phrases are translated automatically in near real-time.</p>
+      </div>
+
+      <div className="language-select">
+        <select value={sourceLanguage} onChange={(e) => setSourceLanguage(e.target.value)}>
+          <option value="en-US">English (US)</option>
+          <option value="ta-IN">Tamil (IN)</option>
+          <option value="te-IN">Telugu (IN)</option>
+          <option value="hi-IN">Hindi (IN)</option>
+        </select>
+        <span>→</span>
+        <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)}>
+          <option value="en-US">English (US)</option>
+          <option value="ta-IN">Tamil (IN)</option>
+          <option value="te-IN">Telugu (IN)</option>
+          <option value="hi-IN">Hindi (IN)</option>
+        </select>
+      </div>
+
+      <button type="button" onClick={handleSpeechTranslate} disabled={!file || translating} className="translate-btn">
+        {translating ? 'Translating Audio...' : 'Translate Speech'}
+      </button>
+
+      <div className="speech-results">
+        <div className="speech-result-block">
+          <h3>Recognized Text</h3>
+          <p>{liveTranscript || recognizedText || 'Recognized speech will appear here...'}</p>
+        </div>
+        <div className="speech-result-block">
+          <h3>Translated Text</h3>
+          <p>{liveTranslation || translatedText || 'Translated text will appear here...'}</p>
+        </div>
+      </div>
+
+      <div className="confidence">Confidence: {(confidence * 100).toFixed(1)}%</div>
+
+      <div className="speech-actions">
+        <button
+          type="button"
+          className="upload-btn"
+          onClick={handleGenerateAudio}
+          disabled={!translatedText.trim()}
+        >
+          Generate Audio
+        </button>
+        {audioUrl && <audio controls src={audioUrl} className="speech-audio-player" />}
+      </div>
+
+      {error && <div className="error-box">{error}</div>}
+    </div>
+  );
+};
+
 // Main App Component
 export default function App() {
   const [activeTab, setActiveTab] = useState('translate');
@@ -439,11 +747,18 @@ export default function App() {
         >
           📄 Documents
         </button>
+        <button
+          className={activeTab === 'speech' ? 'active' : ''}
+          onClick={() => setActiveTab('speech')}
+        >
+          🎤 Speech
+        </button>
       </nav>
 
       <main className="content">
         {activeTab === 'translate' && <TranslationEditor />}
         {activeTab === 'documents' && <DocumentTranslator />}
+        {activeTab === 'speech' && <SpeechTranslator />}
       </main>
 
       <footer className="app-footer">
