@@ -28,3 +28,8 @@ websockets
 peft
 langdetect
 difflib
+SpeechRecognition
+pyttsx3
+pydub
+google-cloud-speech
+librosa
