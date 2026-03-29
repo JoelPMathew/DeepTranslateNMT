@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "DeepTranslateNMT",
+  "version": "1.0.0",
+  "description": "Offline-capable browser translator powered by your local DeepTranslateNMT backend.",
+  "action": {
+    "default_title": "DeepTranslateNMT",
+    "default_popup": "popup.html"
+  },
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "activeTab",
+    "notifications"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8000/*",
+    "http://localhost:8000/*",
+    "http://127.0.0.1:6000/*",
+    "http://localhost:6000/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_page": "options.html",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "deeptranslatenmt@local"
+    }
+  }
+}

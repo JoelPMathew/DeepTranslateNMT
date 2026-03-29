@@ -106,6 +106,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Add request/response logging middleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from time import time
+
+class LoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        start_time = time()
+        try:
+            response = await call_next(request)
+            process_time = time() - start_time
+            logger.info(f"[{response.status_code}] {request.method} {request.url.path} ({process_time:.3f}s)")
+            return response
+        except Exception as e:
+            process_time = time() - start_time
+            logger.error(f"[500] {request.method} {request.url.path} - {type(e).__name__}: {e} ({process_time:.3f}s)")
+            raise
+
+app.add_middleware(LoggingMiddleware)
+
 # Initialize components
 BASE_DIR = Path(__file__).resolve().parent.parent
 registry = LightweightRegistry(str(BASE_DIR / "config" / "language_registry.json"))
@@ -120,6 +140,12 @@ ollama_translator = OllamaTranslator(
     base_url=os.getenv("OLLAMA_URL", "http://127.0.0.1:11434"),
     model=os.getenv("OLLAMA_MODEL", "qwen2.5:0.5b"),
 )
+
+# Enforce Google as the primary and required translator for API responses.
+GOOGLE_TRANSLATE_REQUIRED = True
+
+# Restrict runtime translation routes to known language codes.
+SUPPORTED_LANG_CODES = {"ta", "te", "kn", "ml", "hi", "en"}
 
 GLOSSARY_FILE = BASE_DIR / "data" / "custom_glossary.json"
 
@@ -182,6 +208,29 @@ def _detect_ambiguity_hints(text: str) -> List[str]:
         if re.search(rf"\b{re.escape(word)}\b", lower_text):
             suggestions.append(f"Ambiguous term '{word}' detected. {hint} Add context and retry.")
     return suggestions
+
+
+def _normalize_informal_english(text: str) -> str:
+    """Normalize common elongated English greetings/chatspeak to canonical forms."""
+    normalized = " ".join((text or "").lower().split())
+    if not normalized:
+        return normalized
+
+    patterns = [
+        (r"^h+i+$", "hi"),
+        (r"^he+y+$", "hey"),
+        (r"^hell+o+$", "hello"),
+        (r"^thank+\s*u+$", "thank you"),
+        (r"^thank+s+$", "thank you"),
+        (r"^pl+e+a+s+e+$", "please"),
+    ]
+
+    compact = re.sub(r"[^a-z\s]", "", normalized).strip()
+    for pattern, canonical in patterns:
+        if re.fullmatch(pattern, compact):
+            return canonical
+
+    return normalized
 
 
 def _build_recovery_suggestions(
@@ -366,35 +415,65 @@ class DocumentTranslateRequest(BaseModel):
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """Enhanced health check endpoint with diagnostics"""
+    import sys
     return {
         "status": "healthy",
+        "version": "2.0.0",
+        "python": sys.version.split()[0],
+        "api_url": "http://127.0.0.1:6000",
         "supported_languages": registry.get_supported_languages(),
-        "supported_pairs": list(registry.get_supported_language_pairs().keys())
+        "supported_pairs": list(registry.get_supported_language_pairs().keys()),
+        "providers": {
+            "google": GoogleTranslator is not None,
+            "cloud_llm": cloud_llm_translator.is_configured(),
+            "ollama": ollama_translator.is_available(),
+        },
+        "debug": {
+            "cors_enabled": True,
+            "logging_enabled": True,
+        }
     }
+
 
 
 @app.post("/api/v2/translate", response_model=TranslateResponse)
 async def translate(request: TranslateRequest):
     """
-    Translate text with automatic language detection
+    Pure Google Translate-only endpoint.
+    Translates text using Google Translate with strict language validation.
     """
+    log_request_id = id(request)
+    logger.info(f"[{log_request_id}] ▶ GOOGLE-ONLY Translation Request")
+    
     try:
-        text = request.text.strip()
+        text = request.text.strip() if request.text else ""
         if not text:
             raise ValueError("Empty text provided")
 
-        # Auto-detect language if not provided
-        if not request.source_language:
+        # Language detection/validation
+        if request.source_language:
+            source_language = request.source_language.strip().lower()
+        else:
+            detected_lang, conf = language_detector.detect_language(text)
+            source_language = detected_lang.value
+            logger.info(f"  > Auto-detected: {source_language} ({conf:.0%})")
+
+        if source_language not in SUPPORTED_LANG_CODES:
+            logger.warning(f"[{log_request_id}] Unsupported source language '{source_language}', defaulting to auto-detect")
             detected_lang, confidence = language_detector.detect_language(text)
             source_language = detected_lang.value
-            logger.info(f"Auto-detected language: {source_language} (confidence: {confidence:.2%})")
-        else:
-            source_language = request.source_language
 
         # Determine target language
-        target_language = request.target_language or (
+        target_language = (request.target_language.strip().lower() if request.target_language else None) or (
             "en" if source_language != "en" else "ta"
+        )
+        if target_language not in SUPPORTED_LANG_CODES:
+            logger.warning(f"[{log_request_id}] Unsupported target language '{target_language}', defaulting to 'en'")
+            target_language = "en"
+
+        logger.info(
+            f"[{log_request_id}] Translation route: source={source_language}, target={target_language}, style={request.style}, audience={request.audience}"
         )
         audience = (request.audience or "general").strip().lower()
         style = (request.style or "formal").strip().lower()
@@ -429,84 +508,108 @@ async def translate(request: TranslateRequest):
             "hows going": "how are you",
         }
         lower_text = slang_map.get(canonical_text, canonical_text)
+        flags: List[str] = []
+
+        # Handle elongated informal English inputs like "hiiiiii".
+        if source_language == "en":
+            normalized_informal = _normalize_informal_english(lower_text)
+            if normalized_informal != lower_text:
+                lower_text = normalized_informal
+                protected_input = normalized_informal
+                flags.append("informal_normalization")
+
         glossary_sig = "|".join(sorted(f"{k}:{v}" for k, v in runtime_glossary.items()))
         cache_key = f"{source_language}->{target_language}::{audience}::{style}::{lower_text}::{glossary_sig}"
 
         alternatives: List[str] = []
-        flags: List[str] = []
         provider = "unknown"
         back_translation: Optional[str] = None
         quality_score = 0.6
         rationale = _audience_style_note(audience)
 
         # Primary provider: Google Translate module
-        if GoogleTranslator is not None:
-            try:
-                translated_text = GoogleTranslator(source=source_language, target=target_language).translate(protected_input)
-                translated_text = _restore_term_lock(translated_text, placeholder_map)
-                translated_text = _apply_style_variant(translated_text, style, target_language)
-                if translated_text and translated_text.strip():
-                    provider = "google"
+        if GoogleTranslator is None:
+            raise RuntimeError("googletrans/deep_translator GoogleTranslator is unavailable. Install dependencies and restart API.")
 
-                    if request.enable_deep_checks and request.return_alternatives and cloud_llm_translator.is_configured():
-                        try:
-                            alt_text, _ = cloud_llm_translator.translate(
-                                text=text,
-                                source_language=source_language,
-                                target_language=target_language,
-                                style=style,
-                            )
-                            alt_text = _restore_term_lock(alt_text, placeholder_map)
-                            alt_text = _apply_style_variant(alt_text, style, target_language)
-                            if alt_text and alt_text.strip() and alt_text.strip() != translated_text.strip():
-                                alternatives.append(alt_text.strip())
-                        except Exception as alt_err:
-                            logger.info(f"Alternative translation skipped: {alt_err}")
+        try:
+            translated_text = GoogleTranslator(source=source_language, target=target_language).translate(protected_input)
+            if translated_text is None:
+                raise RuntimeError("Google returned None")
+            translated_text = str(translated_text)
+            if not translated_text.strip():
+                raise RuntimeError("Google returned empty translation")
 
-                    similarity_score = 0.75
-                    if request.enable_deep_checks and GoogleTranslator is not None:
-                        try:
-                            back_translation = GoogleTranslator(source=target_language, target=source_language).translate(translated_text)
-                            similarity_score = SequenceMatcher(
-                                None,
-                                text.lower().strip(),
-                                (back_translation or "").lower().strip(),
-                            ).ratio()
-                        except Exception as back_err:
-                            logger.info(f"Back-translation check unavailable: {back_err}")
+            translated_text = _restore_term_lock(translated_text, placeholder_map)
+            translated_text = _apply_style_variant(translated_text, style, target_language)
+            if translated_text and translated_text.strip():
+                provider = "google"
 
-                    confidence = 0.98
-                    quality_score = round((confidence * 0.7) + (similarity_score * 0.3), 3)
-                    if similarity_score < 0.55:
-                        flags.append("meaning_drift_risk")
+                if request.enable_deep_checks and request.return_alternatives and cloud_llm_translator.is_configured():
+                    try:
+                        alt_text, _ = cloud_llm_translator.translate(
+                            text=text,
+                            source_language=source_language,
+                            target_language=target_language,
+                            style=style,
+                        )
+                        alt_text = _restore_term_lock(alt_text, placeholder_map)
+                        alt_text = _apply_style_variant(alt_text, style, target_language)
+                        if alt_text and alt_text.strip() and alt_text.strip() != translated_text.strip():
+                            alternatives.append(alt_text.strip())
+                    except Exception as alt_err:
+                        logger.info(f"Alternative translation skipped: {alt_err}")
 
-                    translation_memory.add(cache_key, translated_text)
-                    translation_memory.save()
-                    recovery_suggestions = _build_recovery_suggestions(
-                        original_text=text,
-                        quality_score=quality_score,
-                        used_cache=False,
-                        low_quality_reason="Try adding domain-specific glossary terms to lock critical terms." if similarity_score < 0.55 else None,
-                    )
-                    return TranslateResponse(
-                        original_text=text,
-                        translated_text=translated_text,
-                        source_language=source_language,
-                        target_language=target_language,
-                        confidence=confidence,
-                        quality_score=quality_score,
-                        style=style,
-                        audience=audience,
-                        provider=provider,
-                        cached=False,
-                        alternatives=alternatives,
-                        rationale=rationale,
-                        back_translation=back_translation,
-                        recovery_suggestions=recovery_suggestions,
-                        flags=flags,
-                    )
-            except Exception as google_error:
-                logger.warning(f"GoogleTranslate failed, falling back: {google_error}")
+                similarity_score = 0.75
+                if request.enable_deep_checks and GoogleTranslator is not None:
+                    try:
+                        back_translation = GoogleTranslator(source=target_language, target=source_language).translate(translated_text)
+                        similarity_score = SequenceMatcher(
+                            None,
+                            text.lower().strip(),
+                            (back_translation or "").lower().strip(),
+                        ).ratio()
+                    except Exception as back_err:
+                        logger.info(f"Back-translation check unavailable: {back_err}")
+
+                confidence = 0.98
+                quality_score = round((confidence * 0.7) + (similarity_score * 0.3), 3)
+                if similarity_score < 0.55:
+                    flags.append("meaning_drift_risk")
+
+                translation_memory.add(cache_key, translated_text)
+                translation_memory.save()
+                recovery_suggestions = _build_recovery_suggestions(
+                    original_text=text,
+                    quality_score=quality_score,
+                    used_cache=False,
+                    low_quality_reason="Try adding domain-specific glossary terms to lock critical terms." if similarity_score < 0.55 else None,
+                )
+                return TranslateResponse(
+                    original_text=text,
+                    translated_text=translated_text,
+                    source_language=source_language,
+                    target_language=target_language,
+                    confidence=confidence,
+                    quality_score=quality_score,
+                    style=style,
+                    audience=audience,
+                    provider=provider,
+                    cached=False,
+                    alternatives=alternatives,
+                    rationale=rationale,
+                    back_translation=back_translation,
+                    recovery_suggestions=recovery_suggestions,
+                    flags=flags,
+                )
+            if GOOGLE_TRANSLATE_REQUIRED:
+                raise RuntimeError(f"Google returned empty translation for {source_language}->{target_language}")
+        except Exception as google_error:
+            logger.error(f"[{log_request_id}] GoogleTranslate failed: {google_error}")
+            if GOOGLE_TRANSLATE_REQUIRED:
+                raise RuntimeError(f"Google translation failed for {source_language}->{target_language}: {google_error}")
+
+        if GOOGLE_TRANSLATE_REQUIRED:
+            raise RuntimeError(f"Google translation unavailable for {source_language}->{target_language}")
 
         # Reliable phrase overrides for common expressions.
         # These are applied before cache/LLM to avoid bad generations for key phrases.
@@ -541,7 +644,7 @@ async def translate(request: TranslateRequest):
             )
 
         # Check translation memory first
-        if request.use_translation_memory:
+        if request.use_translation_memory and not GOOGLE_TRANSLATE_REQUIRED:
             cached_translation = translation_memory.lookup(cache_key)
             if cached_translation:
                 logger.info("Found in translation memory")
@@ -654,7 +757,8 @@ async def translate(request: TranslateRequest):
             low_quality_reason="Try setting audience to 'technical' and pass glossary terms for domain words." if quality_score < 0.65 else None,
         )
 
-        return TranslateResponse(
+        # Build and validate response
+        response = TranslateResponse(
             original_text=text,
             translated_text=translated_text,
             source_language=source_language,
@@ -671,10 +775,21 @@ async def translate(request: TranslateRequest):
             recovery_suggestions=recovery_suggestions,
             flags=flags,
         )
+        
+        logger.info(f"[{log_request_id}] ✓ Translation successful (provider={provider}, confidence={confidence:.2f}, quality={quality_score:.2f})")
+        return response
 
+    except ValueError as ve:
+        logger.error(f"[{log_request_id}] Input validation error: {ve}")
+        raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
-        logger.error(f"Translation error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"[{log_request_id}] ✗ Unexpected translation error: {type(e).__name__}: {e}", exc_info=True)
+        # Always return a valid error response
+        error_detail = str(e) if str(e) else "Unknown error occurred during translation"
+        raise HTTPException(
+            status_code=500, 
+            detail=error_detail
+        )
 
 
 # ============================================================================

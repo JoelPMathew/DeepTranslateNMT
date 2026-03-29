@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DeepTranslateNMT</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>DeepTranslateNMT</h1>
+      <p>Offline translator (local backend)</p>
+    </header>
+
+    <label for="inputText">Text</label>
+    <textarea id="inputText" rows="6" placeholder="Type or paste text"></textarea>
+
+    <div class="row">
+      <div>
+        <label for="sourceLanguage">From</label>
+        <select id="sourceLanguage"></select>
+      </div>
+      <div>
+        <label for="targetLanguage">To</label>
+        <select id="targetLanguage"></select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label for="style">Style</label>
+        <select id="style">
+          <option value="formal">Formal</option>
+          <option value="neutral">Neutral</option>
+          <option value="casual">Casual</option>
+        </select>
+      </div>
+      <div>
+        <label for="audience">Audience</label>
+        <select id="audience">
+          <option value="general">General</option>
+          <option value="student">Student</option>
+          <option value="professional">Professional</option>
+          <option value="marketing">Marketing</option>
+          <option value="technical">Technical</option>
+        </select>
+      </div>
+    </div>
+
+    <button id="translateBtn">Translate</button>
+    <button id="swapBtn" class="secondary">Swap Languages</button>
+
+    <label for="outputText">Translation</label>
+    <textarea id="outputText" rows="6" readonly placeholder="Translated text"></textarea>
+
+    <div id="status" class="status"></div>
+
+    <div class="footer">
+      <button id="copyBtn" class="secondary">Copy Output</button>
+      <button id="openOptionsBtn" class="secondary">Options</button>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

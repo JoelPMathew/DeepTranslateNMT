@@ -12,17 +12,23 @@ if __name__ == "__main__":
     try:
         import uvicorn
         from enhanced_api import app
+
+        host = os.getenv("API_HOST", "127.0.0.1")
+        port = int(os.getenv("API_PORT", "6000"))
         
         print("=" * 60)
         print("[*] DeepTranslate Pro 2.0 - API Server")
         print("=" * 60)
-        print("Starting server on http://127.0.0.1:6000")
+        print(f"Starting server on http://{host}:{port}")
+        if port == 6000:
+            print("[!] Note: Chrome extensions block port 6000 (ERR_UNSAFE_PORT).")
+            print("[!] For extension use, run with API_PORT=8000.")
         print("Press Ctrl+C to stop\n")
         
         uvicorn.run(
             app,
-            host="127.0.0.1",
-            port=6000,
+            host=host,
+            port=port,
             reload=False,  # Disable reload to avoid issues on Windows
             log_level="info"
         )

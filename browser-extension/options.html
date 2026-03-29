@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DeepTranslateNMT Options</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>DeepTranslateNMT - Extension Settings</h1>
+    <p>Configure your local backend endpoint and defaults.</p>
+
+    <label for="apiBaseUrl">Local API Base URL</label>
+    <input id="apiBaseUrl" type="text" placeholder="http://127.0.0.1:6000" />
+
+    <label for="sourceLanguage">Default Source Language</label>
+    <select id="sourceLanguage"></select>
+
+    <label for="targetLanguage">Default Target Language</label>
+    <select id="targetLanguage"></select>
+
+    <label for="style">Default Style</label>
+    <select id="style">
+      <option value="formal">Formal</option>
+      <option value="neutral">Neutral</option>
+      <option value="casual">Casual</option>
+    </select>
+
+    <label for="audience">Default Audience</label>
+    <select id="audience">
+      <option value="general">General</option>
+      <option value="student">Student</option>
+      <option value="professional">Professional</option>
+      <option value="marketing">Marketing</option>
+      <option value="technical">Technical</option>
+    </select>
+
+    <label class="checkbox">
+      <input id="useTranslationMemory" type="checkbox" />
+      Use Translation Memory
+    </label>
+
+    <div class="actions">
+      <button id="saveBtn">Save Settings</button>
+      <button id="testBtn" class="secondary">Test Connection</button>
+    </div>
+
+    <div id="status" class="status"></div>
+
+    <section class="tips">
+      <h2>Offline Usage</h2>
+      <ol>
+        <li>Start local API: <code>python run_api.py</code></li>
+        <li>Ensure API is reachable at your URL above</li>
+        <li>No internet is needed once model/backend are local</li>
+      </ol>
+    </section>
+  </main>
+  <script src="options.js"></script>
+</body>
+</html>

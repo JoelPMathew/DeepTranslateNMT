@@ -84,6 +84,37 @@ export const TranslationEditor = () => {
     return suggestions;
   };
 
+  const parseJSON = async (response) => {
+    // Safely parse JSON response with detailed logging
+    const contentType = response.headers.get('content-type');
+    const statusText = `${response.status} ${response.statusText}`;
+    
+    // Handle empty responses (204, etc.)
+    if (response.status === 204) {
+      throw new Error('Server returned empty response (204 No Content)');
+    }
+
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error(`[DEBUG] Non-JSON Content-Type: ${contentType || 'none'}`);
+      console.error(`[DEBUG] Raw response body (${text.length} chars):`, text.slice(0, 500));
+      throw new Error(`Server returned ${contentType || 'non-JSON'} (${statusText})`);
+    }
+
+    const text = await response.text();
+    if (!text || text.trim() === '') {
+      console.error(`[DEBUG] Empty JSON body with status ${statusText}`);
+      throw new Error(`Unexpected empty response (${statusText})`);
+    }
+
+    try {
+      return JSON.parse(text);
+    } catch (parseError) {
+      console.error(`[DEBUG] JSON parse failed on: ${text.slice(0, 200)}`);
+      throw new Error(`Invalid JSON from server (${statusText}): ${parseError.message}`);
+    }
+  };
+
   const submitTranslation = async (overrides = {}) => {
     const text = (overrides.sourceText ?? sourceText).trim();
     if (!text) return;
@@ -91,28 +122,51 @@ export const TranslationEditor = () => {
     setErrorText('');
     setRecoveryStatus('');
     try {
+      const requestBody = {
+        text,
+        source_language: overrides.sourceLanguage ?? sourceLanguage,
+        target_language: overrides.targetLanguage ?? targetLanguage,
+        style: overrides.style ?? style,
+        audience: overrides.audience ?? audience,
+        glossary_terms: parseGlossary(overrides.glossaryText ?? glossaryText),
+        return_alternatives: false,
+        enable_deep_checks: false,
+        use_translation_memory: overrides.useTranslationMemory ?? useTranslationMemory,
+      };
+      
+      console.log('[DEBUG] POST /api/v2/translate', requestBody);
+      
       const response = await fetch(`${API_BASE}/translate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text,
-          source_language: overrides.sourceLanguage ?? sourceLanguage,
-          target_language: overrides.targetLanguage ?? targetLanguage,
-          style: overrides.style ?? style,
-          audience: overrides.audience ?? audience,
-          glossary_terms: parseGlossary(overrides.glossaryText ?? glossaryText),
-          return_alternatives: false,
-          enable_deep_checks: false,
-          use_translation_memory: overrides.useTranslationMemory ?? useTranslationMemory,
-        }),
+        body: JSON.stringify(requestBody),
       });
 
+      console.log(`[DEBUG] Response status: ${response.status} ${response.statusText}`);
+      
+      // Parse response with robust error handling
+      const data = await parseJSON(response);
+      
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.detail || 'Translation failed');
+        // Error response with valid JSON
+        const errorMessage = data.detail || data.error || 'Translation failed';
+        console.error('[DEBUG] Backend error response:', data);
+        throw new Error(errorMessage);
       }
 
-      const data = await response.json();
+      // Success response - validate critical fields
+      if (!data.translated_text) {
+        console.warn('[DEBUG] Response missing translated_text field:', data);
+        throw new Error('Server returned incomplete response (missing translated_text)');
+      }
+
+      console.log('[DEBUG] Translation successful:', {
+        provider: data.provider,
+        confidence: data.confidence,
+        quality: data.quality_score,
+        cached: data.cached,
+      });
+
       setTranslatedText(data.translated_text || '');
       setConfidence(data.confidence || 0);
       setQualityScore(data.quality_score || 0);
@@ -132,10 +186,15 @@ export const TranslationEditor = () => {
       setFlags(data.flags || []);
       setBackTranslation(data.back_translation || '');
     } catch (error) {
-      console.error('Translation error:', error);
-      setErrorText(error.message || 'Translation error.');
+      console.error('[ERROR] Translation failed:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+      });
+      setErrorText(error.message || 'Translation error. Check console for details.');
       setRecoverySuggestions([
         'Translation request failed. Check backend service status and retry.',
+        'Verify backend is running: http://127.0.0.1:6000/health',
         'Try disabling cache and switching style to Neutral for a clean attempt.',
       ]);
     }
